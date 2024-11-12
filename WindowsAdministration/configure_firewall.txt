@@ -1,0 +1,21 @@
+# Check if the script is running with administrative privileges
+$myWindowsID = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$myWindowsPrincipal = New-Object System.Security.Principal.WindowsPrincipal($myWindowsID)
+$adminRole = [System.Security.Principal.WindowsBuiltInRole]::Administrator
+
+if (!$myWindowsPrincipal.IsInRole($adminRole)) {
+    # Relaunch the script as administrator
+    $newProcess = New-Object System.Diagnostics.ProcessStartInfo "PowerShell"
+    $newProcess.Arguments = $myInvocation.MyCommand.Definition
+    $newProcess.Verb = "runas"
+    [System.Diagnostics.Process]::Start($newProcess)
+    exit
+}
+
+# Define ports and create rules
+$ports = @(25, 80, 143, 443, 993)
+foreach ($port in $ports) {
+    New-NetFirewallRule -DisplayName "Allow Port $port" -Direction Inbound -LocalPort $port -Protocol TCP -Action Allow
+    Write-Host "Rule added for port $port." -ForegroundColor Green
+}
+Write-Host "Firewall configuration complete." -ForegroundColor Green

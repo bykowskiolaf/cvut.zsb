@@ -1,0 +1,54 @@
+# Check if the script is running with administrative privileges
+$myWindowsID = [System.Security.Principal.WindowsIdentity]::GetCurrent()
+$myWindowsPrincipal = New-Object System.Security.Principal.WindowsPrincipal($myWindowsID)
+$adminRole = [System.Security.Principal.WindowsBuiltInRole]::Administrator
+
+if (!$myWindowsPrincipal.IsInRole($adminRole)) {
+    # Relaunch the script as administrator
+    $newProcess = New-Object System.Diagnostics.ProcessStartInfo "PowerShell"
+    $newProcess.Arguments = $myInvocation.MyCommand.Definition
+    $newProcess.Verb = "runas"
+    [System.Diagnostics.Process]::Start($newProcess)
+    exit
+}
+
+# Get the username and password from the user
+$username = Read-Host "What would you like your user to be named?"
+$SecurePassword = Read-Host "What password would you like to give the user?" -AsSecureString
+
+# Convert the SecureString to a plain text string
+$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecurePassword)
+$UnsecurePassword = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+
+# Password validation checks
+if ($UnsecurePassword.Length -lt 16) {
+    Write-Host "Error: The password needs to be at least 16 characters long." -BackgroundColor White -ForegroundColor Red
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+    return
+} elseif ($UnsecurePassword -notmatch '[^a-zA-Z0-9]') {
+    Write-Host "Error: The password must contain at least one special character." -BackgroundColor White -ForegroundColor Red
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+    return
+} elseif ($UnsecurePassword -notmatch '[A-Z]') {
+    Write-Host "Error: The password must contain at least one uppercase letter." -BackgroundColor White -ForegroundColor Red
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+    return
+} elseif ($UnsecurePassword -notmatch '[a-z]') {
+    Write-Host "Error: The password must contain at least one lowercase letter." -BackgroundColor White -ForegroundColor Red
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+    return
+} elseif ($UnsecurePassword -notmatch '[0-9]') {
+    Write-Host "Error: The password must contain at least one number." -BackgroundColor White -ForegroundColor Red
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+    return
+}
+
+# Free the BSTR memory
+[Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+
+# Create the user with the given parameters
+New-LocalUser -Name $username -Password (ConvertTo-SecureString $SecurePassword -AsPlainText -Force)
+Write-Host "User '$username' created successfully." -ForegroundColor Green
+
+# Wait for user input before closing
+$null = $Host.UI.RawUI.ReadKey("NoEcho,IncludeKeyDown")
